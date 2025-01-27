@@ -1,0 +1,43 @@
+# 依賴套件
+node_modules/
+demucs-env/
+
+# 環境設定
+.env
+.env.local
+.env.*
+
+# 編譯輸出
+dist/
+build/
+
+# 暫存檔案
+server/temp/
+server/output/
+
+# 資料庫
+server/db/*.db
+
+# 系統檔案
+.DS_Store
+Thumbs.db
+
+# IDE 設定
+.vscode/
+.idea/
+*.sublime-*
+
+# 日誌檔案
+*.log
+logs/
+npm-debug.log*
+
+# 快取
+.cache/
+.npm/
+.eslintcache
+
+# 其他
+*.swp
+*.swo
+*~
