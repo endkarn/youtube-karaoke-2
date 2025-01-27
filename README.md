@@ -14,6 +14,14 @@
 - 🌙 內建深色模式
 - ⚡ 即時處理狀態更新
 
+## 展示
+
+### 首頁：轉檔、歌單、列表
+![首頁](https://github.com/charlesc/youtube-karaoke/blob/main/demo/home.png)
+
+### 歌曲頁：同時或單獨播放人聲、伴奏兩個音軌
+![歌曲頁](https://github.com/charlesc/youtube-karaoke/blob/main/demo/karaoke.png)
+
 ## 系統需求
 
 ### 使用 Docker 部署（推薦）
