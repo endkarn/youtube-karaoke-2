@@ -16,7 +16,7 @@ export default function PlaylistsPage() {
     >
       <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
         <Typography variant="h5" gutterBottom>
-          我的歌單
+          My Playlists
         </Typography>
 
         <Box sx={{ mt: 3 }}>
@@ -29,7 +29,7 @@ export default function PlaylistsPage() {
               color="text.secondary"
               sx={{ textAlign: 'center', py: 4 }}
             >
-              尚未建立任何歌單
+              No playlists created yet
             </Typography>
           )}
         </Box>

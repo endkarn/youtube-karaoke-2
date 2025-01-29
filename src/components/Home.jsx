@@ -101,14 +101,14 @@ function Home() {
 
       if (!response.ok) {
         const error = await response.json()
-        throw new Error(error.error || '處理失敗')
+        throw new Error(error.error || 'Processing Failed')
       }
 
       setUrl('')
       // 轉換完成時更新 state，觸發重新載入
       setConversionComplete(prev => prev + 1)
     } catch (err) {
-      setError('處理過程發生錯誤，請稍後再試')
+      setError('An error occurred during processing, please try again later')
       console.error('Error:', err)
     } finally {
       setLoading(false)
@@ -151,7 +151,7 @@ function Home() {
               <form onSubmit={handleSubmit}>
                 <StyledTextField
                   fullWidth
-                  label="輸入 YouTube 影片網址"
+                  label="Enter YouTube Video URL"
                   variant="outlined"
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
@@ -175,7 +175,7 @@ function Home() {
                     }
                   }}
                 >
-                  {loading ? '處理中...' : '開始轉換'}
+                  {loading ? 'Processing...' : 'Start Converting'}
                 </Button>
               </form>
 
@@ -237,7 +237,7 @@ function Home() {
               <Box sx={{ mb: 4 }}>
                 <StyledTextField
                   fullWidth
-                  placeholder="搜尋已轉換的影片..."
+                  placeholder="Search converted videos..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   InputProps={{
@@ -256,7 +256,7 @@ function Home() {
                 <VideoList 
                   conversionComplete={conversionComplete}
                   searchQuery={searchQuery}
-                  title="最新歌曲"
+                  title="Latest Songs"
                 />
               </Box>
             </Box>

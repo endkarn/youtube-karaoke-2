@@ -125,7 +125,7 @@ export default function Playlist({ playlist }) {
                 }}
                 sx={{ ml: 2 }}
               >
-                播放
+                Play
               </Button>
             )}
           </Box>
@@ -135,7 +135,7 @@ export default function Playlist({ playlist }) {
               color="text.secondary"
               sx={{ mr: 1 }}
             >
-              {playlist.songs.length} 首歌曲
+              {playlist.songs.length} songs
             </Typography>
             {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
           </Box>
@@ -226,7 +226,7 @@ export default function Playlist({ playlist }) {
                 {playlist.songs.length === 0 && (
                   <ListItem>
                     <ListItemText
-                      secondary="尚未加入任何歌曲"
+                      secondary="No songs added yet"
                       sx={{ textAlign: 'center', color: 'text.secondary' }}
                     />
                   </ListItem>

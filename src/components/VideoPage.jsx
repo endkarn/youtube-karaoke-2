@@ -34,7 +34,7 @@ function VideoPage() {
   const [hasPlaylistParam, setHasPlaylistParam] = useState(false)
   const { currentPlaylist, currentSongIndex, playNextSong, startPlaylist } = usePlaylist()
   
-  // 從 URL 讀取歌單 ID
+  // Read playlist ID from URL
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const playlistId = params.get('playlist')
@@ -48,7 +48,7 @@ function VideoPage() {
   
   const [audioStates, setAudioStates] = useState({
     isPlaying: false,
-    vocalsVolume: 0.5,
+    vocalsVolume: 1,
     karaokeVolume: 1,
     vocalsMuted: false,
     karaokeMuted: false,
@@ -61,14 +61,14 @@ function VideoPage() {
   const youtubePlayerRef = useRef(null)
 
   useEffect(() => {
-    // 更新頁面標題
+    // Update page title
     if (videoData) {
-      document.title = `${videoData.title} － YouTube 卡拉OK 轉換器`;
+      document.title = `${videoData.title} - YouTube Karaoke Converter`;
     }
   }, [videoData]);
 
   useEffect(() => {
-    // 載入影片資料
+    // Load video data
     const fetchVideoData = async () => {
       try {
         const response = await fetch(`${API_BASE_URL}/conversions`)
@@ -80,13 +80,13 @@ function VideoPage() {
           }
         }
       } catch (error) {
-        console.error('載入影片資料失敗:', error)
+        console.error('Failed to load video data:', error)
       }
     }
 
     fetchVideoData()
 
-    // 清理
+    // Cleanup
     return () => {
       if (wavesurferRef.current.vocals) {
         wavesurferRef.current.vocals.destroy()
@@ -97,25 +97,34 @@ function VideoPage() {
     }
   }, [id])
 
-  // 當 videoData 更新且 DOM 已渲染完成後，初始化 WaveSurfer
+  // Initialize WaveSurfer when videoData updates and DOM is rendered
   useEffect(() => {
     if (!videoData) return;
 
-    // 使用 requestAnimationFrame 確保 DOM 已更新
+    // Use requestAnimationFrame to ensure DOM is updated
     const initTimer = requestAnimationFrame(async () => {
-      console.log('開始初始化 WaveSurfer...');
+      console.log('Starting WaveSurfer initialization...');
       try {
         await initializeWaveSurfer(videoData);
-        console.log('WaveSurfer 初始化完成');
+        console.log('WaveSurfer initialization complete');
+        
+        // Add 1 second delay before auto-playing
+        setTimeout(() => {
+          if (youtubePlayerRef.current) {
+            youtubePlayerRef.current.playVideo();
+            toggleMute('vocals');
+          }
+        }, 1000);
+        
       } catch (error) {
-        console.error('WaveSurfer 初始化失敗:', error);
+        console.error('WaveSurfer initialization failed:', error);
       }
     });
 
     return () => cancelAnimationFrame(initTimer);
   }, [videoData]);
 
-  // 格式化時間
+  // Format time
   const formatTime = (time) => {
     if (!time) return '0:00'
     const minutes = Math.floor(time / 60)
@@ -125,19 +134,27 @@ function VideoPage() {
 
   const initializeWaveSurfer = async (video) => {
     try {
-      // 等待 DOM 元素準備好
+      // Wait for DOM elements to be ready
       await new Promise(resolve => setTimeout(resolve, 100));
 
-      // 檢查容器元素是否存在
+      // Check if container elements exist
       const vocalsContainer = document.querySelector('#vocals-waveform');
       const karaokeContainer = document.querySelector('#karaoke-waveform');
       
       if (!vocalsContainer || !karaokeContainer) {
-        console.error('找不到波形圖容器元素');
+        console.error('Waveform container elements not found');
         return;
       }
 
-      // 創建人聲波形實例
+      // Cleanup existing instances if they exist
+      if (wavesurferRef.current.vocals) {
+        wavesurferRef.current.vocals.destroy();
+      }
+      if (wavesurferRef.current.karaoke) {
+        wavesurferRef.current.karaoke.destroy();
+      }
+
+      // Create vocals waveform instance
       const vocalsWavesurfer = WaveSurfer.create({
         container: vocalsContainer,
         waveColor: '#9c27b0',
@@ -153,7 +170,7 @@ function VideoPage() {
         normalize: true,
       })
 
-      // 創建伴奏波形實例
+      // Create karaoke waveform instance
       const karaokeWavesurfer = WaveSurfer.create({
         container: karaokeContainer,
         waveColor: '#2196f3',
@@ -169,27 +186,27 @@ function VideoPage() {
         normalize: true,
       })
 
-      // 載入音頻
-      await Promise.all([
-        vocalsWavesurfer.load(`${API_BASE_URL}${video.vocals_path}`),
-        karaokeWavesurfer.load(`${API_BASE_URL}${video.karaoke_path}`)
-      ]).catch(error => {
-        console.error('載入音頻檔案失敗:', error);
-        return;
-      });
-
-      // 保存實例
+      // Save instances before loading audio
       wavesurferRef.current = {
         vocals: vocalsWavesurfer,
         karaoke: karaokeWavesurfer
       }
 
-      // 設置音訊播放器的事件監聽
+      // Load audio files
+      await Promise.all([
+        vocalsWavesurfer.load(`${API_BASE_URL}${video.vocals_path}`),
+        karaokeWavesurfer.load(`${API_BASE_URL}${video.karaoke_path}`)
+      ]).catch(error => {
+        console.error('Failed to load audio files:', error);
+        return;
+      });
+
+      // Set up event listeners for audio players
       const wavesurfers = [vocalsWavesurfer, karaokeWavesurfer]
       wavesurfers.forEach(wavesurfer => {
         wavesurfer.on('ready', () => {
-          // 音訊載入完成後，設置初始音量和總時長
-          wavesurfer.setVolume(wavesurfer === vocalsWavesurfer ? 0.5 : 1)
+          // Set initial volume - vocals will be muted (0)
+          wavesurfer.setVolume(wavesurfer === vocalsWavesurfer ? 0 : 1)
           const duration = wavesurfer.getDuration()
           setAudioStates(prev => ({
             ...prev,
@@ -197,7 +214,7 @@ function VideoPage() {
           }))
         })
 
-        // 允許點擊波形來跳轉，同時更新所有播放進度
+        // Allow clicking on waveform to seek, and update all playback progress
         wavesurfer.on('seek', () => {
           if (youtubePlayerRef.current) {
             const currentTime = wavesurfer.getCurrentTime()
@@ -210,7 +227,7 @@ function VideoPage() {
           }
         })
 
-        // 監聽播放進度變化
+        // Listen for playback progress changes
         wavesurfer.on('timeupdate', () => {
           const currentTime = wavesurfer.getCurrentTime()
           setAudioStates(prev => ({
@@ -221,19 +238,19 @@ function VideoPage() {
         })
       })
     } catch (error) {
-      console.error('初始化 WaveSurfer 失敗:', error)
+      console.error('Failed to initialize WaveSurfer:', error)
     }
   }
 
-  // YouTube 播放器控制
+  // YouTube player control
   const handleYouTubeStateChange = (event) => {
     const wavesurfers = wavesurferRef.current
     if (!wavesurfers.vocals || !wavesurfers.karaoke) return
 
-    // YouTube 播放器狀態：
-    // -1 (未開始) 0 (結束) 1 (播放中) 2 (暫停) 3 (緩衝中) 5 (已插入影片)
+    // YouTube player states:
+    // -1 (unstarted) 0 (ended) 1 (playing) 2 (paused) 3 (buffering) 5 (video cued)
     switch (event.data) {
-      case 1: // 播放中
+      case 1: // Playing
         wavesurfers.vocals.play()
         wavesurfers.karaoke.play()
         setAudioStates(prev => ({ 
@@ -244,7 +261,7 @@ function VideoPage() {
           currentSeconds: event.target.getCurrentTime()
         }))
         break
-      case 2: // 暫停
+      case 2: // Paused
         wavesurfers.vocals.pause()
         wavesurfers.karaoke.pause()
         setAudioStates(prev => ({ 
@@ -254,11 +271,11 @@ function VideoPage() {
           currentSeconds: event.target.getCurrentTime()
         }))
         break
-      case 3: // 緩衝中
+      case 3: // Buffering
         wavesurfers.vocals.pause()
         wavesurfers.karaoke.pause()
         break
-      case 0: // 結束
+      case 0: // Ended
         wavesurfers.vocals.pause()
         wavesurfers.karaoke.pause()
         setAudioStates(prev => ({ 
@@ -268,7 +285,7 @@ function VideoPage() {
           currentSeconds: event.target.getDuration()
         }))
         
-        // 如果正在播放歌單，自動播放下一首
+        // If playing a playlist, automatically play next song
         if (currentPlaylist) {
           const nextSong = playNextSong()
           if (nextSong) {
@@ -279,7 +296,7 @@ function VideoPage() {
     }
   }
 
-  // 定期同步音訊與影片時間
+  // Periodically sync audio with video time
   useEffect(() => {
     let animationFrameId
     let lastSyncTime = 0
@@ -293,7 +310,7 @@ function VideoPage() {
         const youtubeTime = youtubePlayerRef.current.getCurrentTime()
         const duration = youtubePlayerRef.current.getDuration()
 
-        // 更新進度條和時間顯示
+        // Update progress bar and time display
         setAudioStates(prev => ({
           ...prev,
           currentTime: formatTime(youtubeTime),
@@ -301,7 +318,7 @@ function VideoPage() {
           currentSeconds: youtubeTime
         }))
 
-        // 音訊同步邏輯
+        // Audio sync logic
         const wavesurfers = wavesurferRef.current
         if (wavesurfers.vocals?.isReady && wavesurfers.karaoke?.isReady) {
           const now = Date.now()
@@ -312,14 +329,14 @@ function VideoPage() {
           }
         }
       } catch (error) {
-        console.warn('更新進度時發生錯誤:', error)
+        console.warn('Error updating progress:', error)
       }
 
-      // 確保下一幀的更新
+      // Ensure next frame's update
       animationFrameId = window.requestAnimationFrame(updateProgress)
     }
 
-    // 開始更新循環
+    // Start update loop
     animationFrameId = window.requestAnimationFrame(updateProgress)
 
     return () => {
@@ -383,7 +400,7 @@ function VideoPage() {
       }}
     >
         <Box sx={{ my: 4 }}>
-          <Typography>載入中...</Typography>
+          <Typography>Loading...</Typography>
         </Box>
       </Container>
     )
@@ -398,15 +415,15 @@ function VideoPage() {
         px: { xs: 2, sm: 3, md: 4 }
       }}
     >
-      {/* 影片區域 */}
+      {/* Video area */}
       <Paper elevation={3} sx={{ p: 3, mb: 3 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
             <Box>
               <Typography variant="h5">
                 <Link to="/" style={{ textDecoration: 'none', color: 'inherit' }}>
-                  YouTube 卡拉OK
+                  YouTube Karaoke
                 </Link>
-                {' － '}{videoData.title}
+                {' - '}{videoData.title}
               </Typography>
             </Box>
             <Box>
@@ -415,7 +432,7 @@ function VideoPage() {
                 startIcon={<PlaylistAddIcon />}
                 onClick={() => setPlaylistDialogOpen(true)}
               >
-                加入歌單
+                Add to Playlist
               </Button>
             </Box>
           </Box>
@@ -425,7 +442,7 @@ function VideoPage() {
             mb: { xs: 2, sm: 3 }, 
             width: '100%',
             position: 'relative',
-            paddingTop: '56.25%' // 16:9 比例
+            paddingTop: '56.25%' // 16:9 aspect ratio
           }}>
             <YouTube
               videoId={videoData.video_id}
@@ -447,9 +464,9 @@ function VideoPage() {
               }}
               onReady={(event) => {
                 youtubePlayerRef.current = event.target
-                // 設置 YouTube 音量為 0（因為我們使用分離的音軌）
+                // Set YouTube volume to 0 (since we use separate tracks)
                 event.target.setVolume(0)
-                // 設置總時長
+                // Set total duration
                 const duration = event.target.getDuration()
                 setAudioStates(prev => ({
                   ...prev,
@@ -462,13 +479,13 @@ function VideoPage() {
 
       </Paper>
 
-      {/* 控制區域 */}
+      {/* Control area */}
       <Box sx={{ 
         display: 'flex', 
         flexDirection: { xs: 'column', md: 'row' },
         gap: 3 
       }}>
-        {/* 左側主欄：播放控制和音軌 */}
+        {/* Left column: playback controls and audio tracks */}
         <Paper elevation={3} sx={{ 
           p: 3, 
           flex: '1 1 auto',
@@ -495,15 +512,15 @@ function VideoPage() {
                   onChange={(_, value) => {
                     const wavesurfers = wavesurferRef.current;
                     if (wavesurfers.vocals && wavesurfers.karaoke) {
-                      // 先更新 WaveSurfer 的進度
+                      // Update WaveSurfer progress first
                       wavesurfers.vocals.seekTo(value / youtubePlayerRef.current.getDuration());
                       wavesurfers.karaoke.seekTo(value / youtubePlayerRef.current.getDuration());
                     }
-                    // 再更新 YouTube 播放器的進度
+                    // Then update YouTube player progress
                     if (youtubePlayerRef.current) {
                       youtubePlayerRef.current.seekTo(value, true);
                     }
-                    // 更新進度條狀態
+                    // Update progress bar state
                     setAudioStates(prev => ({
                       ...prev,
                       currentSeconds: value,
@@ -520,7 +537,7 @@ function VideoPage() {
 
           <Box sx={{ mb: { xs: 2, sm: 3 } }}>
             <Typography variant="h6" gutterBottom>
-              伴奏音樂（無人聲）
+              Karaoke Track (No Vocals)
             </Typography>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
               <MusicNoteIcon sx={{ mr: 1 }} />
@@ -554,7 +571,7 @@ function VideoPage() {
           
           <Box sx={{ mb: { xs: 2, sm: 3 } }}>
             <Typography variant="h6" gutterBottom>
-              人聲音軌
+              Vocals Track
             </Typography>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
               <MicIcon sx={{ mr: 1 }} />
@@ -588,7 +605,7 @@ function VideoPage() {
 
         </Paper>
 
-        {/* 右側欄：歌單列表（只在有歌單參數時顯示） */}
+        {/* Right column: playlist list (only shown when there is a playlist parameter) */}
         {hasPlaylistParam && currentPlaylist && (
           <Paper 
             elevation={3} 

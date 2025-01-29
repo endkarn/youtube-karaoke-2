@@ -80,7 +80,7 @@ const StyledCardActionArea = styled(CardActionArea)({
 function VideoList({ 
   conversionComplete, 
   searchQuery, 
-  title = "已轉換的影片庫",
+  title = "Converted Videos Library",
   songs,
   showPlaylistActions = true,
   playlistId
@@ -111,7 +111,7 @@ function VideoList({
           setConversions(data)
         }
       } catch (error) {
-        console.error('載入記錄失敗:', error)
+        console.error('Failed to load records:', error)
       } finally {
         setLoading(false)
       }
@@ -125,7 +125,7 @@ function VideoList({
       {[1, 2, 3, 4].map((item) => (
         <Grid item xs={12} sm={6} key={item}>
           <StyledCard>
-            <Box sx={{ position: 'relative', paddingTop: '56.25%' /* 16:9 比例 */ }}>
+            <Box sx={{ position: 'relative', paddingTop: '56.25%' /* 16:9 aspect ratio */ }}>
               <Skeleton 
                 variant="rectangular" 
                 sx={{
@@ -180,11 +180,11 @@ function VideoList({
                     <StyledCard>
                       <Box sx={{ position: 'relative' }}>
                         <StyledCardActionArea component={Link} to={`/video/${conversion.id}`}>
-                          <Box sx={{ position: 'relative', paddingTop: '56.25%' /* 16:9 比例 */ }}>
+                          <Box sx={{ position: 'relative', paddingTop: '56.25%' /* 16:9 aspect ratio */ }}>
                             <CardMedia
                               component="img"
                               image={`https://img.youtube.com/vi/${conversion.video_id}/maxresdefault.jpg`}
-                              alt={conversion.title}
+                              alt={conversion.title || 'Unknown Title'}
                               onError={(e) => {
                                 e.target.src = `https://img.youtube.com/vi/${conversion.video_id}/0.jpg`
                               }}
@@ -211,7 +211,7 @@ function VideoList({
                               mb: 1
                             }}
                           >
-                            {conversion.title || '未知標題'}
+                            {conversion.title || 'Unknown Title'}
                           </Typography>
                           <Box sx={{ 
                             display: 'flex', 
@@ -220,7 +220,7 @@ function VideoList({
                           }}>
                             <AccessTimeIcon sx={{ fontSize: 16, mr: 0.5 }} />
                             <Typography variant="body2">
-                              {Math.floor(conversion.duration / 60)}分{conversion.duration % 60}秒
+                              {Math.floor(conversion.duration / 60)}min{conversion.duration % 60}sec
                             </Typography>
                           </Box>
                           </CardContent>
@@ -292,10 +292,10 @@ function VideoList({
           setVideoToDelete(null);
         }}
       >
-        <DialogTitle>確認刪除</DialogTitle>
+        <DialogTitle>Confirm Delete</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            確定要刪除「{videoToDelete?.title || '未知標題'}」嗎？這個操作將永久刪除這首歌曲。
+            Are you sure you want to delete "{videoToDelete?.title || 'Unknown Title'}"? This action will permanently delete this song.
           </DialogContentText>
         </DialogContent>
         <DialogActions>
@@ -305,7 +305,7 @@ function VideoList({
               setVideoToDelete(null);
             }}
           >
-            取消
+            Cancel
           </Button>
           <Button 
             onClick={async () => {
@@ -328,7 +328,7 @@ function VideoList({
                     }
                   }
                 } catch (error) {
-                  console.error('刪除歌曲失敗:', error);
+                  console.error('Failed to delete song:', error);
                 }
               }
               setDeleteDialogOpen(false);
@@ -337,7 +337,7 @@ function VideoList({
             color="error"
             autoFocus
           >
-            刪除
+            Delete
           </Button>
         </DialogActions>
       </Dialog>

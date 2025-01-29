@@ -53,7 +53,7 @@ export default function PlaylistSongsPage() {
           <VideoList 
             songs={playlist.songs}
             showPlaylistActions={false}
-            title={`${playlist.songs.length} 首歌曲`}
+            title={`${playlist.songs.length} songs`}
             playlistId={playlistId}
           />
       </Box>

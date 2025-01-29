@@ -43,17 +43,17 @@ export default function PlaylistDialog({ open, onClose, onSelect, song }) {
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>加入歌單</DialogTitle>
+      <DialogTitle>Add to Playlist</DialogTitle>
       <DialogContent>
         <Box sx={{ mb: 3 }}>
           <Typography variant="subtitle1" gutterBottom>
-            建立新歌單
+            Create New Playlist
           </Typography>
           <Box sx={{ display: 'flex', gap: 1 }}>
             <TextField
               fullWidth
               size="small"
-              placeholder="輸入歌單名稱"
+              placeholder="Enter playlist name"
               value={newPlaylistName}
               onChange={(e) => setNewPlaylistName(e.target.value)}
             />
@@ -62,7 +62,7 @@ export default function PlaylistDialog({ open, onClose, onSelect, song }) {
               onClick={handleCreatePlaylist}
               disabled={!newPlaylistName.trim()}
             >
-              建立
+              Create
             </Button>
           </Box>
         </Box>
@@ -70,7 +70,7 @@ export default function PlaylistDialog({ open, onClose, onSelect, song }) {
         <Divider sx={{ my: 2 }} />
 
         <Typography variant="subtitle1" gutterBottom>
-          或選擇現有歌單
+          Or Select Existing Playlist
         </Typography>
         <List sx={{ width: '100%' }}>
           {playlists.map((playlist) => (
@@ -78,7 +78,7 @@ export default function PlaylistDialog({ open, onClose, onSelect, song }) {
               <ListItemButton onClick={() => handleSelectPlaylist(playlist)}>
                 <ListItemText 
                   primary={playlist.name}
-                  secondary={`${playlist.songs.length} 首歌曲`}
+                  secondary={`${playlist.songs.length} songs`}
                 />
               </ListItemButton>
             </ListItem>
@@ -86,7 +86,7 @@ export default function PlaylistDialog({ open, onClose, onSelect, song }) {
           {playlists.length === 0 && (
             <ListItem>
               <ListItemText 
-                secondary="尚未建立任何歌單"
+                secondary="No playlists created yet"
                 sx={{ textAlign: 'center', color: 'text.secondary' }}
               />
             </ListItem>
@@ -94,7 +94,7 @@ export default function PlaylistDialog({ open, onClose, onSelect, song }) {
         </List>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>取消</Button>
+        <Button onClick={onClose}>Cancel</Button>
       </DialogActions>
     </Dialog>
   );

@@ -19,30 +19,30 @@ const __dirname = dirname(__filename);
 const app = express();
 const port = 3006;
 
-// 創建事件發射器用於狀態更新
+// Create event emitter for status updates
 const statusEmitter = new EventEmitter();
 
-// 建立必要的目錄
+// Create necessary directories
 const tempDir = join(__dirname, 'temp');
 const outputDir = join(__dirname, 'output');
 const dbDir = join(__dirname, 'db');
 const dbPath = join(dbDir, 'karaoke.db');
 
-// 確保必要的目錄存在
+// Ensure necessary directories exist
 async function ensureDirectories() {
   await fs.mkdir(tempDir, { recursive: true });
   await fs.mkdir(outputDir, { recursive: true });
   await fs.mkdir(dbDir, { recursive: true });
 }
 
-// 初始化資料庫
+// Initialize database
 async function initDatabase() {
   const db = await open({
     filename: dbPath,
     driver: sqlite3.Database
   });
 
-  // 建立轉換記錄表和歌單相關表
+  // Create conversion record table and playlist related tables
   await db.exec(`
     CREATE TABLE IF NOT EXISTS conversions (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -77,10 +77,10 @@ async function initDatabase() {
   return db;
 }
 
-// 全域資料庫連接
+// Global database connection
 let db;
 
-// 配置 CORS
+// Configure CORS
 const corsOptions = {
   origin: ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175', 'http://localhost:5176', 'http://localhost:5177'],
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
@@ -91,33 +91,33 @@ app.use(cors(corsOptions));
 app.use(express.json());
 app.use('/output', express.static(outputDir));
 
-// SSE 路由
+// SSE route
 app.get('/status', cors(corsOptions), (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
 
-  // 發送狀態更新到客戶端
+  // Send status updates to client
   const sendStatus = (status) => {
     res.write(`data: ${JSON.stringify(status)}\n\n`);
   };
 
   statusEmitter.on('statusUpdate', sendStatus);
 
-  // 當客戶端斷開連接時清理
+  // Clean up when client disconnects
   req.on('close', () => {
     statusEmitter.removeListener('statusUpdate', sendStatus);
   });
 });
 
-// 用於發送狀態更新的函數
+// Function for sending status updates
 function sendStatusUpdate(status) {
   statusEmitter.emit('statusUpdate', status);
 }
 
-// 提取YouTube影片ID
+// Extract YouTube video ID
 function extractYouTubeVideoId(url) {
-  // 處理不同的YouTube URL格式，包括更複雜的YouTube Music URL
+  // Process different YouTube URL formats, including more complex YouTube Music URLs
   const patterns = [
     /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/,
     /(?:https?:\/\/)?(?:www\.)?(?:music\.youtube\.com\/(?:watch\?v=|embed\/|v\/)?)([a-zA-Z0-9_-]{11})/,
@@ -131,15 +131,15 @@ function extractYouTubeVideoId(url) {
     }
   }
 
-  throw new Error('無效的YouTube影片網址');
+  throw new Error('Invalid YouTube video URL');
 }
 
-// 下載YouTube影片
+// Download YouTube video
 async function downloadYouTube(url, outputPath) {
   try {
-    sendStatusUpdate({ message: '開始檢查影片資訊', url });
+    sendStatusUpdate({ message: 'Starting to check video information', url });
     
-    // 先獲取影片資訊
+    // First get video information
     const info = await youtubeDl(url, {
       dumpSingleJson: true,
       noWarnings: true,
@@ -148,19 +148,19 @@ async function downloadYouTube(url, outputPath) {
       youtubeSkipDashManifest: true,
     });
 
-    // 檢查影片時長（秒）
+    // Check video duration (seconds)
     const duration = info.duration;
-    if (duration > 600) { // 10分鐘 = 600秒
-      throw new Error('影片時長超過限制');
+    if (duration > 600) { // 10 minutes = 600 seconds
+      throw new Error('Video duration exceeds limit');
     }
 
     sendStatusUpdate({ 
-      message: '影片時長', 
-      duration: `${Math.floor(duration / 60)}分${duration % 60}秒` 
+      message: 'Video duration', 
+      duration: `${Math.floor(duration / 60)} minutes ${duration % 60} seconds` 
     });
-    sendStatusUpdate({ message: '開始下載YouTube影片' });
+    sendStatusUpdate({ message: 'Starting to download YouTube video' });
     
-    // 使用youtube-dl-exec下載，並顯示進度
+    // Use youtube-dl-exec to download and show progress
     await youtubeDl(url, {
       extractAudio: true,
       audioFormat: 'mp3',
@@ -179,146 +179,146 @@ async function downloadYouTube(url, outputPath) {
       onProgress: (progress) => {
         if (progress.percent) {
           const percent = (progress.percent * 100).toFixed(1);
-          process.stdout.write(`\r下載進度: ${percent}%`);
+          process.stdout.write(`\rDownload progress: ${percent}%`);
         }
       }
     });
-    console.log('\n'); // 換行
+    console.log('\n'); // New line
 
-    // 檢查檔案是否成功下載
+    // Check if file is successfully downloaded
     await fs.access(outputPath);
-    sendStatusUpdate({ message: 'YouTube影片下載完成' });
+    sendStatusUpdate({ message: 'YouTube video download completed' });
     
     return outputPath;
   } catch (error) {
-    console.error('下載YouTube影片時發生錯誤:', error);
-    throw new Error(`下載YouTube影片失敗: ${error.message}`);
+    console.error('Error downloading YouTube video:', error);
+    throw new Error(`Failed to download YouTube video: ${error.message}`);
   }
 }
 
-// 檢查 demucs 是否已安裝
+// Check if demucs is installed
 async function checkDemucs() {
   try {
     await execAsync('which demucs');
     return true;
   } catch (error) {
-    console.error('Demucs 未安裝或無法執行');
+    console.error('Demucs not installed or unable to execute');
     return false;
   }
 }
 
-// 分離人聲和伴奏
+// Separate vocals and accompaniment
 async function separateAudio(inputPath, outputPath) {
   try {
-    // 檢查 demucs 是否已安裝
+    // Check if demucs is installed
     if (!await checkDemucs()) {
-      throw new Error('Demucs 未安裝，請先安裝 Demucs');
+      throw new Error('Demucs not installed, please install Demucs first');
     }
 
-    // 使用demucs進行音訊分離
-    // -n htdemucs 使用高品質模型
-    // --two-stems=vocals 將音訊分離為人聲和伴奏兩個部分
+    // Use demucs for audio separation
+    // -n htdemucs use high quality model
+    // --two-stems=vocals separate audio into vocals and accompaniment
     const separatedDir = join(tempDir, 'separated');
     
-    // 確保分離目錄是乾淨的
+    // Ensure separated directory is clean
     try {
       await fs.rm(separatedDir, { recursive: true, force: true });
     } catch (error) {
-      // 忽略錯誤，如果目錄不存在
+      // Ignore error if directory does not exist
     }
     
-    // 使用demucs進行分離，使用htdemucs_ft模型，並監控進度
-    sendStatusUpdate({ message: '開始音訊分離處理...' });
+    // Use demucs for separation, use htdemucs_ft model, and monitor progress
+    sendStatusUpdate({ message: 'Starting audio separation processing...' });
     
     let errorOutput = '';
     const demucsProcess = exec(`demucs "${inputPath}" -n htdemucs --two-stems=vocals --mp3 --out "${separatedDir}"`);
     
-    // 監控demucs的進度輸出
+    // Monitor demucs output
     demucsProcess.stderr.on('data', (data) => {
       const output = data.toString();
-      errorOutput += output; // 收集錯誤輸出
+      errorOutput += output; // Collect error output
       
       if (output.includes('Separated track')) {
-        sendStatusUpdate({ message: '人聲分離完成', progress: 50 });
+        sendStatusUpdate({ message: 'Voice separation completed', progress: 50 });
       } else if (output.includes('Applying effects')) {
-        sendStatusUpdate({ message: '正在處理音效', progress: 75 });
+        sendStatusUpdate({ message: 'Processing audio effects', progress: 75 });
       }
-      // 輸出詳細日誌以便調試
-      console.log('Demucs 輸出:', output);
+      // Output detailed logs for debugging
+      console.log('Demucs output:', output);
     });
 
-    // 監控標準輸出
+    // Monitor standard output
     demucsProcess.stdout.on('data', (data) => {
-      console.log('Demucs 輸出:', data.toString());
+      console.log('Demucs output:', data.toString());
     });
 
-    // 等待demucs完成
+    // Wait for demucs to complete
     await new Promise((resolve, reject) => {
       demucsProcess.on('close', (code) => {
         if (code === 0) {
-          sendStatusUpdate({ message: '音訊分離完成', progress: 100 });
+          sendStatusUpdate({ message: 'Audio separation completed', progress: 100 });
           resolve();
         } else {
-          console.error('Demucs 錯誤輸出:', errorOutput);
-          reject(new Error(`Demucs 處理失敗，錯誤碼: ${code}\n錯誤信息: ${errorOutput}`));
+          console.error('Demucs error output:', errorOutput);
+          reject(new Error(`Demucs processing failed, error code: ${code}\nError information: ${errorOutput}`));
         }
       });
       
-      // 設置超時檢查
+      // Set timeout check
       const timeout = setTimeout(() => {
         demucsProcess.kill();
-        reject(new Error('音訊分離處理超時'));
-      }, 600000); // 10分鐘超時
+        reject(new Error('Audio separation processing timeout'));
+      }, 1200000); // 10 minutes timeout
 
       demucsProcess.on('close', () => clearTimeout(timeout));
     });
     
-    // 找到伴奏和人聲檔案
+    // Find accompaniment and vocals files
     const trackName = basename(inputPath, '.mp3');
     const accompanimentPath = join(separatedDir, 'htdemucs', trackName, 'no_vocals.mp3');
     const vocalsPath = join(separatedDir, 'htdemucs', trackName, 'vocals.mp3');
-    console.log('伴奏檔案路徑:', accompanimentPath);
-    console.log('人聲檔案路徑:', vocalsPath);
+    console.log('Accompaniment file path:', accompanimentPath);
+    console.log('Vocals file path:', vocalsPath);
     
-    // 檢查檔案是否存在
+    // Check if files exist
     try {
       await fs.access(accompanimentPath);
       await fs.access(vocalsPath);
     } catch (error) {
-      console.error('找不到分離後的音訊檔案:', error);
-      throw new Error('音訊分離失敗');
+      console.error('Separated audio files not found:', error);
+      throw new Error('Audio separation failed');
     }
 
-    // 複製處理好的mp3檔案到輸出目錄
+    // Copy processed mp3 files to output directory
     const vocalsOutputPath = outputPath.replace('_karaoke.mp3', '_vocals.mp3');
     await fs.copyFile(accompanimentPath, outputPath);
     await fs.copyFile(vocalsPath, vocalsOutputPath);
-    console.log('音訊檔案複製完成');
+    console.log('Audio files copied successfully');
     
-    // 清理臨時檔案
+    // Clean up temporary files
     try {
       await fs.rm(separatedDir, { recursive: true, force: true });
     } catch (error) {
-      console.error('清理臨時檔案失敗:', error);
+      console.error('Failed to clean up temporary files:', error);
     }
     
     return outputPath;
   } catch (error) {
-    console.error('音訊處理時發生錯誤:', error);
-    // 根據錯誤類型提供更具體的錯誤訊息
-    if (error.message.includes('Demucs 未安裝')) {
+    console.error('Error processing audio:', error);
+    // Provide more specific error messages based on error type
+    if (error.message.includes('Demucs not installed')) {
       throw new Error(error.message);
-    } else if (error.message.includes('Demucs 處理失敗')) {
-      throw new Error(error.message); // 保留完整的錯誤信息，包含 demucs 的輸出
-    } else if (error.message.includes('音訊分離處理超時')) {
-      throw new Error('音訊分離處理超時，請選擇較短的影片或稍後再試');
+    } else if (error.message.includes('Demucs processing failed')) {
+      throw new Error(error.message); // Keep full error information, including demucs output
+    } else if (error.message.includes('Audio separation timeout')) {
+      throw new Error('Audio separation processing took too long, please try again later or choose a shorter video');
     } else {
-      throw new Error(`音訊處理失敗: ${error.message}`);
+      throw new Error(`Audio processing failed: ${error.message}`);
     }
   }
 }
 
-// 檢查影片是否已經轉換過
+// Check if video has already been converted
 async function checkExistingConversion(videoId) {
   const result = await db.get(
     'SELECT * FROM conversions WHERE video_id = ?',
@@ -327,7 +327,7 @@ async function checkExistingConversion(videoId) {
   return result;
 }
 
-// 儲存轉換記錄
+// Save conversion record
 async function saveConversion(videoId, title, duration, karaokePath, vocalsPath) {
   await db.run(
     `INSERT INTO conversions (video_id, title, duration, karaoke_path, vocals_path)
@@ -336,8 +336,8 @@ async function saveConversion(videoId, title, duration, karaokePath, vocalsPath)
   );
 }
 
-// 獲取所有已轉換的影片
-// 歌單相關的 API
+// Get all converted videos
+// Playlist related APIs
 app.get('/playlists', async (req, res) => {
   try {
     const playlists = await db.all(`
@@ -350,7 +350,7 @@ app.get('/playlists', async (req, res) => {
       ORDER BY p.created_at DESC
     `);
     
-    // 獲取每個歌單的歌曲
+    // Get songs for each playlist
     for (let playlist of playlists) {
       const songs = await db.all(`
         SELECT 
@@ -366,19 +366,19 @@ app.get('/playlists', async (req, res) => {
     
     res.json(playlists);
   } catch (error) {
-    console.error('獲取歌單失敗:', error);
-    res.status(500).json({ error: '獲取歌單失敗' });
+    console.error('Failed to get playlists:', error);
+    res.status(500).json({ error: 'Failed to get playlists' });
   }
 });
 
-// 更新歌單名稱
+// Update playlist name
 app.put('/playlists/:id', express.json(), async (req, res) => {
   try {
     const { id } = req.params;
     const { name } = req.body;
     
     if (!name) {
-      return res.status(400).json({ error: '歌單名稱不能為空' });
+      return res.status(400).json({ error: 'Playlist name cannot be empty' });
     }
 
     await db.run(
@@ -392,13 +392,13 @@ app.put('/playlists/:id', express.json(), async (req, res) => {
     );
     
     if (!updatedPlaylist) {
-      return res.status(404).json({ error: '找不到指定的歌單' });
+      return res.status(404).json({ error: 'Playlist not found' });
     }
     
     res.json(updatedPlaylist);
   } catch (error) {
-    console.error('更新歌單失敗:', error);
-    res.status(500).json({ error: '更新歌單失敗' });
+    console.error('Failed to update playlist:', error);
+    res.status(500).json({ error: 'Failed to update playlist' });
   }
 });
 
@@ -406,7 +406,7 @@ app.post('/playlists', express.json(), async (req, res) => {
   try {
     const { name } = req.body;
     if (!name) {
-      return res.status(400).json({ error: '歌單名稱不能為空' });
+      return res.status(400).json({ error: 'Playlist name cannot be empty' });
     }
 
     const result = await db.run(
@@ -421,8 +421,8 @@ app.post('/playlists', express.json(), async (req, res) => {
     
     res.json(playlist);
   } catch (error) {
-    console.error('建立歌單失敗:', error);
-    res.status(500).json({ error: '建立歌單失敗' });
+    console.error('Failed to create playlist:', error);
+    res.status(500).json({ error: 'Failed to create playlist' });
   }
 });
 
@@ -431,7 +431,7 @@ app.post('/playlists/:playlistId/songs', express.json(), async (req, res) => {
     const { playlistId } = req.params;
     const { songId } = req.body;
     
-    // 獲取目前歌單中最大的 position
+    // Get current playlist's maximum position
     const maxPosition = await db.get(
       'SELECT MAX(position) as maxPos FROM playlist_songs WHERE playlist_id = ?',
       playlistId
@@ -445,8 +445,8 @@ app.post('/playlists/:playlistId/songs', express.json(), async (req, res) => {
     
     res.json({ success: true });
   } catch (error) {
-    console.error('加入歌曲失敗:', error);
-    res.status(500).json({ error: '加入歌曲失敗' });
+    console.error('Failed to add song:', error);
+    res.status(500).json({ error: 'Failed to add song' });
   }
 });
 
@@ -459,7 +459,7 @@ app.delete('/playlists/:playlistId/songs/:songId', async (req, res) => {
       [playlistId, songId]
     );
     
-    // 重新排序剩餘歌曲
+    // Re-order remaining songs
     const songs = await db.all(
       'SELECT * FROM playlist_songs WHERE playlist_id = ? ORDER BY position',
       playlistId
@@ -474,8 +474,8 @@ app.delete('/playlists/:playlistId/songs/:songId', async (req, res) => {
     
     res.json({ success: true });
   } catch (error) {
-    console.error('移除歌曲失敗:', error);
-    res.status(500).json({ error: '移除歌曲失敗' });
+    console.error('Failed to remove song:', error);
+    res.status(500).json({ error: 'Failed to remove song' });
   }
 });
 
@@ -484,21 +484,21 @@ app.put('/playlists/:playlistId/songs/reorder', express.json(), async (req, res)
     const { playlistId } = req.params;
     const { fromPosition, toPosition } = req.body;
     
-    // 開始事務
+    // Start transaction
     await db.run('BEGIN TRANSACTION');
     
-    // 獲取要移動的歌曲ID
+    // Get song to move
     const songToMove = await db.get(
       'SELECT id FROM playlist_songs WHERE playlist_id = ? AND position = ?',
       [playlistId, fromPosition]
     );
 
     if (!songToMove) {
-      throw new Error('找不到要移動的歌曲');
+      throw new Error('Song not found');
     }
 
     if (fromPosition < toPosition) {
-      // 向下移動：將中間的歌曲往上移
+      // Move down: Move middle songs up
       await db.run(`
         UPDATE playlist_songs 
         SET position = position - 1 
@@ -507,7 +507,7 @@ app.put('/playlists/:playlistId/songs/reorder', express.json(), async (req, res)
         AND position <= ?
       `, [playlistId, fromPosition, toPosition]);
     } else {
-      // 向上移動：將中間的歌曲往下移
+      // Move up: Move middle songs down
       await db.run(`
         UPDATE playlist_songs 
         SET position = position + 1 
@@ -517,58 +517,58 @@ app.put('/playlists/:playlistId/songs/reorder', express.json(), async (req, res)
       `, [playlistId, toPosition, fromPosition]);
     }
     
-    // 更新移動的歌曲到目標位置
+    // Update moved song to target position
     await db.run(`
       UPDATE playlist_songs 
       SET position = ? 
       WHERE id = ?
     `, [toPosition, songToMove.id]);
     
-    // 提交事務
+    // Commit transaction
     await db.run('COMMIT');
     
     res.json({ success: true });
   } catch (error) {
-    // 回滾事務
+    // Rollback transaction
     await db.run('ROLLBACK');
-    console.error('重新排序失敗:', error);
-    res.status(500).json({ error: '重新排序失敗' });
+    console.error('Failed to reorder:', error);
+    res.status(500).json({ error: 'Failed to reorder' });
   }
 });
 
-// 刪除歌曲
+// Remove song
 app.delete('/conversions/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
-    // 先獲取歌曲資訊，以便刪除檔案
+    // First get song information to delete files
     const conversion = await db.get('SELECT * FROM conversions WHERE id = ?', id);
     if (!conversion) {
-      return res.status(404).json({ error: '找不到指定的歌曲' });
+      return res.status(404).json({ error: 'Song not found' });
     }
 
-    // 刪除音訊檔案
-    // 從資料庫路徑中提取檔案名稱
+    // Delete audio files
+    // Extract file name from database path
     const karaokeFileName = conversion.karaoke_path.split('/').pop();
     const vocalsFileName = conversion.vocals_path.split('/').pop();
     
-    // 構建完整的檔案路徑
+    // Build full file path
     const karaokeFile = join(outputDir, karaokeFileName);
     const vocalsFile = join(outputDir, vocalsFileName);
     try {
       await fs.unlink(karaokeFile);
       await fs.unlink(vocalsFile);
     } catch (error) {
-      console.error('刪除音訊檔案失敗:', error);
+      console.error('Failed to delete audio files:', error);
     }
 
-    // 刪除資料庫記錄（playlist_songs 表中的相關記錄會因為外鍵約束自動刪除）
+    // Delete database record (related records in playlist_songs table will be automatically deleted due to foreign key constraints)
     await db.run('DELETE FROM conversions WHERE id = ?', id);
 
     res.json({ success: true });
   } catch (error) {
-    console.error('刪除歌曲失敗:', error);
-    res.status(500).json({ error: '刪除歌曲失敗' });
+    console.error('Failed to remove song:', error);
+    res.status(500).json({ error: 'Failed to remove song' });
   }
 });
 
@@ -588,31 +588,31 @@ app.get('/conversions', async (req, res) => {
     const conversions = await db.all(query, params);
     res.json(conversions);
   } catch (error) {
-    console.error('獲取轉換記錄失敗:', error);
-    res.status(500).json({ error: '獲取轉換記錄失敗' });
+    console.error('Failed to get conversion records:', error);
+    res.status(500).json({ error: 'Failed to get conversion records' });
   }
 });
 
-// 處理YouTube URL的路由
+// Process YouTube URL route
 app.post('/process', async (req, res) => {
   try {
     const { url } = req.body;
     if (!url) {
-      return res.status(400).json({ error: '需要提供YouTube URL' });
+      return res.status(400).json({ error: 'YouTube URL is required' });
     }
 
-    // 生成唯一的檔案名稱
+    // Generate unique filename
     const timestamp = Date.now();
     const tempFile = join(tempDir, `${timestamp}.mp3`);
     const outputFile = join(outputDir, `${timestamp}_karaoke.mp3`);
 
-    // 提取影片ID
+    // Extract video ID
     const videoId = extractYouTubeVideoId(url);
     
-    // 檢查是否已經轉換過
+    // Check if already converted
     const existing = await checkExistingConversion(videoId);
     if (existing) {
-      console.log('找到已轉換的影片:', videoId);
+      console.log('Found existing converted video:', videoId);
       return res.json({
         karaokeUrl: existing.karaoke_path,
         vocalsUrl: existing.vocals_path,
@@ -620,7 +620,7 @@ app.post('/process', async (req, res) => {
       });
     }
 
-    // 獲取影片資訊
+    // Get video information
     const info = await youtubeDl(url, {
       dumpSingleJson: true,
       noWarnings: true,
@@ -629,11 +629,11 @@ app.post('/process', async (req, res) => {
       youtubeSkipDashManifest: true,
     });
 
-    // 下載並處理影片
+    // Download and process video
     await downloadYouTube(url, tempFile);
     await separateAudio(tempFile, outputFile);
 
-    // 儲存轉換記錄
+    // Save conversion record
     const karaokeUrl = `/output/${timestamp}_karaoke.mp3`;
     const vocalsUrl = `/output/${timestamp}_vocals.mp3`;
     await saveConversion(
@@ -644,47 +644,47 @@ app.post('/process', async (req, res) => {
       vocalsUrl
     );
 
-    // 清理臨時檔案
+    // Clean up temporary files
     await fs.unlink(tempFile);
 
-    // 回傳處理後的檔案URL（包含伴奏和人聲）
+    // Return processed file URL (includes accompaniment and vocals)
     res.json({
       karaokeUrl: `/output/${timestamp}_karaoke.mp3`,
       vocalsUrl: `/output/${timestamp}_vocals.mp3`
     });
 
   } catch (error) {
-    console.error('處理請求時發生錯誤:', error);
-    let errorMessage = '處理過程發生錯誤';
+    console.error('Error processing request:', error);
+    let errorMessage = 'Error occurred during processing';
     
-    // 根據錯誤類型提供更具體的錯誤訊息
-    if (error.message.includes('下載YouTube影片失敗')) {
-      errorMessage = '下載YouTube影片失敗，請確認網址是否正確或影片是否可用';
-    } else if (error.message.includes('音訊分離失敗')) {
-      errorMessage = '人聲分離處理失敗，請確認音訊檔案格式是否正確';
-    } else if (error.message.includes('音訊分離處理超時')) {
-      errorMessage = '人聲分離處理時間過長，請稍後再試或選擇較短的影片';
-    } else if (error.message.includes('Demucs 處理失敗')) {
-      errorMessage = '人聲分離引擎處理失敗，請稍後再試';
-    } else if (error.message.includes('無效的YouTube影片網址')) {
-      errorMessage = '請提供有效的YouTube影片網址';
-    } else if (error.message.includes('影片時長超過限制')) {
-      errorMessage = '影片時長超過限制，請選擇10分鐘以內的影片';
+    // Provide more specific error messages based on error type
+    if (error.message.includes('Failed to download YouTube video')) {
+      errorMessage = 'Failed to download YouTube video, please verify URL is correct or video is available';
+    } else if (error.message.includes('Audio separation failed')) {
+      errorMessage = 'Voice separation processing failed, please verify audio file format';
+    } else if (error.message.includes('Audio separation timeout')) {
+      errorMessage = 'Voice separation processing took too long, please try again later or choose a shorter video';
+    } else if (error.message.includes('Demucs processing failed')) {
+      errorMessage = 'Voice separation engine failed, please try again later';
+    } else if (error.message.includes('Invalid YouTube video URL')) {
+      errorMessage = 'Please provide a valid YouTube video URL';
+    } else if (error.message.includes('Video duration exceeds limit')) {
+      errorMessage = 'Video duration exceeds limit, please choose a video under 10 minutes';
     }
     
     res.status(500).json({ 
       error: errorMessage,
-      details: error.message // 提供詳細的錯誤信息供調試
+      details: error.message // Provide detailed error message for debugging
     });
   }
 });
 
-// 儲存伺服器實例
+// Save server instance
 let serverInstance = null;
 
-// 啟動伺服器
+// Start server
 async function startServer() {
-  // 檢查端口是否被佔用
+  // Check if port is in use
   const isPortInUse = async (port) => {
     return new Promise((resolve) => {
       const server = net.createServer();
@@ -705,20 +705,20 @@ async function startServer() {
 
   await ensureDirectories();
   
-  // 初始化資料庫
+  // Initialize database
   try {
     db = await initDatabase();
-    console.log('資料庫初始化成功');
+    console.log('Database initialization successful');
   } catch (error) {
-    console.error('資料庫初始化失敗:', error);
+    console.error('Database initialization failed:', error);
     process.exit(1);
   }
   
-  // 檢查port是否被佔用
+  // Check if port is in use
   const portInUse = await isPortInUse(port);
   if (portInUse) {
-    console.error(`錯誤: Port ${port} 已被佔用`);
-    console.error('\n要找出占用端口的進程，請執行以下命令：');
+    console.error(`Error: Port ${port} is already in use`);
+    console.error('\nTo find the process using this port, run:');
     if (process.platform === 'darwin') {  // macOS
       console.error(`sudo lsof -i :${port}`);
     } else if (process.platform === 'win32') {  // Windows
@@ -726,7 +726,7 @@ async function startServer() {
     } else {  // Linux
       console.error(`sudo netstat -tulpn | grep :${port}`);
     }
-    console.error('\n然後使用以下命令關閉進程（將 PID 替換為上面命令顯示的進程 ID）：');
+    console.error('\nThen use the following command to kill the process (replace PID with the process ID shown above):');
     if (process.platform === 'win32') {
       console.error('taskkill /F /PID <PID>');
     } else {
@@ -737,19 +737,19 @@ async function startServer() {
   
   return new Promise((resolve, reject) => {
     serverInstance = app.listen(port, () => {
-      console.log(`伺服器運行在 http://localhost:${port}`);
-      console.log('按下 Ctrl+C 可以停止伺服器');
+      console.log(`Server running at http://localhost:${port}`);
+      console.log('Press Ctrl+C to stop the server');
       resolve(serverInstance);
     });
 
     serverInstance.on('error', (err) => {
-      console.error('伺服器啟動失敗:', err);
+      console.error('Server startup failed:', err);
       reject(err);
     });
   });
 }
 
 startServer().catch((error) => {
-  console.error('啟動伺服器時發生錯誤:', error);
+  console.error('Error starting server:', error);
   process.exit(1);
 });
